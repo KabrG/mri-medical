@@ -35,8 +35,6 @@ class CustomDataset(Dataset):
         very_mild_path = os.path.join(dataset_path, "Very mild Dementia")
         moderate_path = os.path.join(dataset_path, "Moderate Dementia")
 
-        
-
     def __len__(self):
         pass
 
@@ -52,10 +50,6 @@ transforms = torch.nn.Sequential(
 
 
 )
-
-
-
-
 
 
 img = Image.open("/Users/kabirguron/.cache/kagglehub/datasets/ninadaithal/imagesoasis/versions/1/data/Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
