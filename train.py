@@ -35,8 +35,7 @@ class CustomDataset(Dataset):
         very_mild_path = os.path.join(dataset_path, "Very mild Dementia")
         moderate_path = os.path.join(dataset_path, "Moderate Dementia")
 
-        # if isTrain:
-        #     self.
+        
 
     def __len__(self):
         pass
