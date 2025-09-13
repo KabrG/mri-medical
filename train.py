@@ -16,11 +16,11 @@ print(torch.version.cuda)
 print(torch.cuda.is_available())
 
 # Download latest version
-path = kagglehub.dataset_download("ninadaithal/imagesoasis")
-path = os.path.join(path, "Data")
+dataset_path = kagglehub.dataset_download("ninadaithal/imagesoasis")
+dataset_path = os.path.join(dataset_path, "Data")
 
 # Dataset info: https://www.kaggle.com/datasets/ninadaithal/imagesoasis
-print("Path to dataset files:", path)
+print("Path to dataset files:", dataset_path)
 
 exit(0)
 # 80% training, 20% testing
@@ -67,6 +67,18 @@ img.show()
 
 
 exit(0)
+
+
+train_dataset = CustomDataset(dataset_path, True, 67)
+test_dataset = CustomDataset(dataset_path, False, 67)
+
+
+batch_size = 32
+
+# Get the dataloaders
+training_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batchsize, shuffle=False)
+
 
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
