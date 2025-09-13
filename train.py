@@ -21,7 +21,7 @@ dataset_path = os.path.join(dataset_path, "Data")
 # Dataset info: https://www.kaggle.com/datasets/ninadaithal/imagesoasis
 print("Path to dataset files:", dataset_path)
 
-exit(0)
+
 # 80% training, 20% testing
 
 # Create a seed to randomly split the dataset
@@ -38,14 +38,14 @@ class CustomDataset(Dataset):
     def __len__(self):
         pass
 
-        return
+        return 1
     
 
     def __getitem__(self, index):
 
         
-        pass
-        return
+        
+        return 1, 1
 
 
 # Create Dataset Class
@@ -55,15 +55,15 @@ transforms = torch.nn.Sequential(
 
 )
 
-img = Image.open("/Users/kabirguron/.cache/kagglehub/datasets/ninadaithal/imagesoasis/versions/1/data/Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
+# img = Image.open("/Users/kabirguron/.cache/kagglehub/datasets/ninadaithal/imagesoasis/versions/1/data/Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
 
 
 
-print(img.size)
-img.show()
+# print(img.size)
+# img.show()
 
 
-exit(0)
+
 
 
 train_dataset = CustomDataset(dataset_path, True, 67)
@@ -74,7 +74,7 @@ batch_size = 32
 
 # Get the dataloaders
 training_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batchsize, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False)
 
 
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
