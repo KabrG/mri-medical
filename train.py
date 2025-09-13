@@ -4,7 +4,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
-from torchvision.datasets import Food101
 import torchvision.models as models
 from PIL import Image
 
@@ -91,6 +90,14 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Loss function 
 criterion = nn.CrossEntropyLoss()
+
+
+
+
+
+
+
+
 
 
 
