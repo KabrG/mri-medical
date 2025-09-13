@@ -35,19 +35,17 @@ class CustomDataset(Dataset):
         moderate_path = os.path.join(dataset_path, "Moderate Dementia")
 
 
-
-
     def __len__(self):
         pass
 
         return
+    
 
     def __getitem__(self, index):
 
         
         pass
-
-
+        return
 
 
 # Create Dataset Class
@@ -82,6 +80,18 @@ test_dataloader = DataLoader(test_dataset, batchsize, shuffle=False)
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
+# Obtain the model (Try ResNet-50)
+weights = models.ResNet50_Weights.DEFAULT
+model = models.resnet50(weights=weights)
+
+
+# Check if a model aready exists
+try:
+    model.load_state_dict(torch.load("MRI_model.pth", map_location=device))
+    print("Loaded existing weights.")
+except FileNotFoundError:
+    print("No existing weights found. Training from scratch.")
 
 
 # Adjust learning rate for optimizer accordingly
