@@ -51,17 +51,34 @@ class CustomDataset(Dataset):
 # Create Dataset Class
 
 # Create a transform object for future use since we want to vary the incoming images
-transforms = torch.nn.Sequential(
+img_transforms = transforms.Compose([
+    transforms.Grayscale(1),
+    # transforms.CenterCrop((228, 228)),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5], std=[0.5]) # default mean and median
+])
 
-)
+temp_path = os.path.join(dataset_path, "Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
 
-# img = Image.open("/Users/kabirguron/.cache/kagglehub/datasets/ninadaithal/imagesoasis/versions/1/data/Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
+img = Image.open(temp_path)
 
 
+print(img.size)
 
-# print(img.size)
-# img.show()
+img = img_transforms(img)
 
+print(img.size())
+
+
+# Only for displaying the image
+to_pil = transforms.ToPILImage()
+img_pil = to_pil(img)
+
+img_pil.show()
+
+# Remember to remove exit
+exit()
 
 
 
