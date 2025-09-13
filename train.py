@@ -28,38 +28,57 @@ exit(0)
 # Create a seed to randomly split the dataset
 class CustomDataset(Dataset):
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
-    def __init__(self, dataset_path: str, isTrain: bool, target_transform=None, transform=None):
+    def __init__(self, dataset_path: str, isTrain: bool, seed: int, target_transform=None, transform=None):
         # Get all the dataset locations
         non_path = os.path.join(dataset_path, "Non Demented")
         mild_path = os.path.join(dataset_path, "Mild Dementia")
         very_mild_path = os.path.join(dataset_path, "Very mild Dementia")
         moderate_path = os.path.join(dataset_path, "Moderate Dementia")
 
+
+
+
     def __len__(self):
         pass
 
+        return
+
     def __getitem__(self, index):
+
+        
         pass
 
 
-# Create Dataset Classs
 
+
+# Create Dataset Class
 
 # Create a transform object for future use since we want to vary the incoming images
 transforms = torch.nn.Sequential(
 
-
 )
-
 
 img = Image.open("/Users/kabirguron/.cache/kagglehub/datasets/ninadaithal/imagesoasis/versions/1/data/Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
 
+
+
 print(img.size)
 img.show()
-# while(1):
-#     pass
-# First interperate the model
 
+
+exit(0)
+
+# Select the device. If CUDA is available (Nvidia GPU's), then it will use it
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+
+# Adjust learning rate for optimizer accordingly
+# Adam optimizer ensures that each weight has its own learning weight
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Loss function 
+criterion = nn.CrossEntropyLoss()
 
 
 
