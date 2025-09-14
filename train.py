@@ -26,15 +26,6 @@ dataset_path = os.path.join(dataset_path, "Data")
 # Dataset info: https://www.kaggle.com/datasets/ninadaithal/imagesoasis
 print("Path to dataset files:", dataset_path)
 
-
-# 80% training, 20% testing
-
-
-
-# dataset_path = os.path.join(dataset_path, "Very mild Dementia")
-# OAS1_0186_MR1_mpr-3_132.jpg
-
-
 # Create Dataset Class
 
 # Create a transform object for future use since we want to vary the incoming images
@@ -50,7 +41,8 @@ i_transforms = transforms.Compose([
 # Create a seed to randomly split the dataset
 class CustomDataset(Dataset):
 
-    def rand_file_list(self, file_path: str, people_num_list: list)->list:
+    @staticmethod
+    def rand_file_list(file_path: str, people_num_list: list)->list:
         # Assume that the dataset incoming is shuffled 
         folder_file_paths = []
 
@@ -88,7 +80,6 @@ class CustomDataset(Dataset):
         pattern = re.compile(r"OAS1_(\d{4})", re.IGNORECASE)
 
         # full_dir = os.path.join(dataset_path, demention_dir)
-        print("Full dir:", full_dir)
         if not os.path.isdir(full_dir):
             return patient_ids
         for fname in os.listdir(full_dir):
@@ -110,7 +101,6 @@ class CustomDataset(Dataset):
 
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
     def __init__(self, dataset_path: str, isTrain: bool, seed: int, img_transforms: transforms, target_transform=None):
-        print(dataset_path)
         self.img_transforms = img_transforms
         dementia_types = ["Non Demented", "Very mild Dementia", "Mild Dementia", "Moderate Dementia"]
         self.entire_file_list = []
@@ -124,7 +114,6 @@ class CustomDataset(Dataset):
 
             # Generate people list
             people_list = self.unique_patient_ids(full_dir, isTrain, seed)
-            # print("People list:", people_list)
             
             # Get all the files
             temp_arr = self.rand_file_list(full_dir, people_list)
@@ -150,58 +139,63 @@ class CustomDataset(Dataset):
 
         return img, self.label_list[index]
 
+class MRIModel(torch.nn.Module):
+    # Resource: https://docs.pytorch.org/tutorials/beginner/introyt/modelsyt_tutorial.html
 
-train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
-print(train_dataset.__len__())
-print(train_dataset.__getitem__(train_dataset.__len__() -1))
+    def __init__(self):
+        super(MRIModel, self).__init__()
 
-exit()
+        self.linear1 = torch.nn.Linear(100, 200)
+        self.activation = torch.nn.ReLU()
+        self.linear2 = torch.nn.Linear(200, 10)
+        self.softmax = torch.nn.Softmax()
+
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.activation(x)
+        x = self.linear2(x)
+        x = self.softmax(x)
+        return x
 
 
+# img = Image.open(temp_path)
 
-temp_path = os.path.join(dataset_path, "Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
-
-img = Image.open(temp_path)
-
-
-print(img.size)
-img = img_transforms(img)
-print(img.size())
+# print(img.size)
+# img = img_transforms(img)
+# print(img.size())
 
 
 # Only for displaying the image
-to_pil = transforms.ToPILImage()
-img_pil = to_pil(img)
+# to_pil = transforms.ToPILImage()
+# img_pil = to_pil(img)
 
-img_pil.show()
+# img_pil.show()
 
-# Remember to remove exit
-exit()
+train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
+test_dataset = CustomDataset(dataset_path, False, 42, i_transforms)
 
-
-train_dataset = CustomDataset(dataset_path, True, 42)
-test_dataset = CustomDataset(dataset_path, False, 42)
-
+print("Created Dataset Objects")
+print(train_dataset.__len__())
+print(test_dataset.__len__())
 
 batch_size = 32
 
 # Get the dataloaders
-training_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False)
 
 
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
+exit()
 # Obtain the model (Try ResNet-50)
 weights = models.ResNet50_Weights.DEFAULT
 model = models.resnet50(weights=weights)
 
-
 # Check if a model aready exists
 try:
-    model.load_state_dict(torch.load("MRI_model.pth", map_location=device))
+    model.load_state_dict(torch.load("mri_model.pth", map_location=device))
     print("Loaded existing weights.")
 except FileNotFoundError:
     print("No existing weights found. Training from scratch.")
@@ -215,5 +209,67 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 
 
+def train(epoch):
+    model.train()
+    for batch_idx, (data, target) in enumerate(train_dataloader):
+        data, target = data.to(device), target.to(device)
 
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+
+        if batch_idx % 100 == 0:
+            print(f"Train Epoch: {epoch} [{batch_idx*len(data)}/{len(train.dataset)} "
+                  f"({100. * batch_idx / len(train_dataloader):.0f}%)]\tLoss: {loss.item():.6f}")
+
+
+def test():
+    model.eval()
+    test_loss = 0
+    correct = 0
+
+    with torch.no_grad():
+        for data, target in test_dataloader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            test_loss += criterion(output, target).item()
+            pred = output.argmax(dim=1, keepdim=True)
+            correct += pred.eq(target.view_as(pred)).sum().item()
+
+    test_loss /= len(train_dataloader.dataset)
+    accuracy = 100. * correct / len(train_dataloader.dataset)
+    print(f"\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_dataloader.dataset)}"
+          f" ({accuracy:.2f}%)\n")
+
+
+# Training loop
+
+print("Testing prior to training")
+
+epochs = 1
+test()
+for epoch in range(1, epochs): 
+    train(epoch)
+    test()
+
+    # Open file in read mode and read if it should continue running
+    run_status = "stop" # By default, the program will stop
+    try:
+        with open("continue_running.txt", "r") as file:
+            run_status = str(file.read()).lower()
+
+    except Exception as p:
+        print(p)
+
+    if run_status == "stop":
+        print("Halting training...")
+        break
+    else:
+        print("Continue training")
+        pass
+
+torch.save(model.state_dict(), "mri_model.pth")
+print("Model weights saved to mri_model.pth")
 
