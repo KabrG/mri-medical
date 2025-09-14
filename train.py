@@ -16,7 +16,8 @@ print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
 
-random.seed(67) # Random seed used for shuffling
+r_seed = 42
+random.seed(r_seed) # Random seed used for shuffling
 
 # Download latest version
 dataset_path = kagglehub.dataset_download("ninadaithal/imagesoasis")
@@ -53,22 +54,22 @@ class CustomDataset(Dataset):
         # Assume that the dataset incoming is shuffled 
         folder_file_paths = []
 
+        # Regex pattern that will be reused
+        pattern = re.compile(r"OAS1_(\d{4})", re.IGNORECASE)
+
         # Loop through the incoming names and append file paths
         for person in people_num_list:
 
             for file in os.scandir(file_path):
                 
-                # Check if file
+                # Check if it is a file
                 if file.is_file():
 
                     # Get the name of the file
-                    file.name
-                    
-                    # Regex command to extract and compare with person
-                    
-                    if 1:
-                        folder_file_paths.append(file.path)
+                    m = pattern.search(file.name)
 
+                    if m and m.group(1) == person: # If it matches person str
+                        folder_file_paths.append(file.path)
                     else:
                         pass # Move on to the next guy
                     
@@ -176,7 +177,6 @@ img_pil.show()
 
 # Remember to remove exit
 exit()
-
 
 
 
