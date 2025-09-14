@@ -9,10 +9,14 @@ from PIL import Image
 
 import os, re, random
 import kagglehub
+import random
+import re
 
 print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
+
+random.seed(67) # Random seed used for shuffling
 
 # Download latest version
 dataset_path = kagglehub.dataset_download("ninadaithal/imagesoasis")
@@ -24,8 +28,57 @@ print("Path to dataset files:", dataset_path)
 
 # 80% training, 20% testing
 
+
+
+dataset_path = os.path.join(dataset_path, "Very mild Dementia")
+# OAS1_0186_MR1_mpr-3_132.jpg
+
+
+# Create Dataset Class
+
+# Create a transform object for future use since we want to vary the incoming images
+img_transforms = transforms.Compose([
+    transforms.Grayscale(1),
+    # transforms.CenterCrop((228, 228)),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5], std=[0.5]) # default mean and median
+])
+
+
 # Create a seed to randomly split the dataset
 class CustomDataset(Dataset):
+
+    def rand_file_list(self, file_path: str, people_num_list: list)->list:
+        # Assume that the dataset incoming is shuffled 
+        folder_file_paths = []
+
+        # Loop through the incoming names and append file paths
+        for person in people_num_list:
+
+            for file in os.scandir(file_path):
+                
+                # Check if file
+                if file.is_file():
+
+                    # Get the name of the file
+                    file.name
+                    
+                    # Regex command to extract and compare with person
+                    
+                    if 1:
+                        folder_file_paths.append(file.path)
+
+                    else:
+                        pass # Move on to the next guy
+                    
+
+        # Shuffle before sending out
+        random.shuffle(folder_file_paths)
+
+        return folder_file_paths
+    
+
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
     def __init__(self, dataset_path: str, isTrain: bool, seed: int, target_transform=None, transform=None):
         # Get all the dataset locations
@@ -34,16 +87,39 @@ class CustomDataset(Dataset):
         very_mild_path = os.path.join(dataset_path, "Very mild Dementia")
         moderate_path = os.path.join(dataset_path, "Moderate Dementia")
 
+        entire_file_list = []
+
+        # non = 0, very mild = 1, mild = 2, moderate = 3
+        label_list = []
+
+        temp_arr = self.rand_file_list(non_path, [])
+        entire_file_list += temp_arr
+        label_list.append([0 for x in temp_arr])
+
+        temp_arr = self.rand_file_list(very_mild_path, [])
+        entire_file_list += temp_arr
+        label_list.append([1 for x in temp_arr])
+
+        temp_arr = self.rand_file_list(mild_path, [])
+        entire_file_list += temp_arr
+        label_list.append([2 for x in temp_arr])
+
+        temp_arr = self.rand_file_list(moderate_path, [])
+        entire_file_list += temp_arr
+        label_list.append([3 for x in temp_arr])
+
 
     def __len__(self):
-        pass
+        
+        return len(self.entire_file_list)
 
-        return 1
-
+    
 
     def __getitem__(self, index):
-
-
+        path = self.entire_file_list[index] 
+        img = Image.open(path)
+        img = img_transforms(img)
+        return
 
         return 1, 1
 
@@ -79,16 +155,6 @@ patients = unique_patient_ids(dataset_path, "Very mild Dementia", False)
 print(f"Found {len(patients)} unique patients")
 print(patients)
 
-# Create Dataset Class
-
-# Create a transform object for future use since we want to vary the incoming images
-img_transforms = transforms.Compose([
-    transforms.Grayscale(1),
-    # transforms.CenterCrop((228, 228)),
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5], std=[0.5]) # default mean and median
-])
 
 temp_path = os.path.join(dataset_path, "Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
 
