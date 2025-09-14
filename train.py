@@ -31,14 +31,14 @@ print("Path to dataset files:", dataset_path)
 
 
 
-dataset_path = os.path.join(dataset_path, "Very mild Dementia")
+# dataset_path = os.path.join(dataset_path, "Very mild Dementia")
 # OAS1_0186_MR1_mpr-3_132.jpg
 
 
 # Create Dataset Class
 
 # Create a transform object for future use since we want to vary the incoming images
-img_transforms = transforms.Compose([
+i_transforms = transforms.Compose([
     transforms.Grayscale(1),
     # transforms.CenterCrop((228, 228)),
     transforms.Resize((224, 224)),
@@ -79,35 +79,62 @@ class CustomDataset(Dataset):
 
         return folder_file_paths
     
+    @staticmethod
+    def unique_patient_ids(full_dir: str, isTrain: bool, seed: int = 42):
+        """
+        Example 'OAS1_0023_MR1_mpr-3_127.jpg' -> patient id 23
+        """
+        patient_ids = set()
+        pattern = re.compile(r"OAS1_(\d{4})", re.IGNORECASE)
+
+        # full_dir = os.path.join(dataset_path, demention_dir)
+        print("Full dir:", full_dir)
+        if not os.path.isdir(full_dir):
+            return patient_ids
+        for fname in os.listdir(full_dir):
+            m = pattern.search(fname)
+            if m:
+                patient_ids.add(m.group(1))
+
+        patient_ids = sorted(patient_ids)
+
+        rng = random.Random(seed)
+        rng.shuffle(patient_ids)
+
+        split_index = int(0.8 * len(patient_ids))
+        train_ids = patient_ids[:split_index]
+        test_ids = patient_ids[split_index:]
+
+        return train_ids if isTrain else test_ids
+
 
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
-    def __init__(self, dataset_path: str, isTrain: bool, seed: int, target_transform=None, transform=None):
-        # Get all the dataset locations
-        non_path = os.path.join(dataset_path, "Non Demented")
-        mild_path = os.path.join(dataset_path, "Mild Dementia")
-        very_mild_path = os.path.join(dataset_path, "Very mild Dementia")
-        moderate_path = os.path.join(dataset_path, "Moderate Dementia")
-
-        entire_file_list = []
+    def __init__(self, dataset_path: str, isTrain: bool, seed: int, img_transforms: transforms, target_transform=None):
+        print(dataset_path)
+        self.img_transforms = img_transforms
+        dementia_types = ["Non Demented", "Very mild Dementia", "Mild Dementia", "Moderate Dementia"]
+        self.entire_file_list = []
+        self.label_list = []
+        
 
         # non = 0, very mild = 1, mild = 2, moderate = 3
-        label_list = []
+        for label, type in enumerate(dementia_types):
+            
+            full_dir = os.path.join(dataset_path, type)
 
-        temp_arr = self.rand_file_list(non_path, [])
-        entire_file_list += temp_arr
-        label_list.append([0 for x in temp_arr])
+            # Generate people list
+            people_list = self.unique_patient_ids(full_dir, isTrain, seed)
+            # print("People list:", people_list)
+            
+            # Get all the files
+            temp_arr = self.rand_file_list(full_dir, people_list)
 
-        temp_arr = self.rand_file_list(very_mild_path, [])
-        entire_file_list += temp_arr
-        label_list.append([1 for x in temp_arr])
+            # Append to big file list
+            self.entire_file_list += temp_arr
 
-        temp_arr = self.rand_file_list(mild_path, [])
-        entire_file_list += temp_arr
-        label_list.append([2 for x in temp_arr])
+            # Add to label list
+            self.label_list += [label for x in temp_arr]
 
-        temp_arr = self.rand_file_list(moderate_path, [])
-        entire_file_list += temp_arr
-        label_list.append([3 for x in temp_arr])
 
 
     def __len__(self):
@@ -119,42 +146,17 @@ class CustomDataset(Dataset):
     def __getitem__(self, index):
         path = self.entire_file_list[index] 
         img = Image.open(path)
-        img = img_transforms(img)
-        return
+        img = self.img_transforms(img)
 
-        return 1, 1
-
-
-def unique_patient_ids(dataset_path: str, demention_dir: str, isTrain: bool, seed: int = 42):
-    """
-    Example 'OAS1_0023_MR1_mpr-3_127.jpg' -> patient id 23
-    """
-    patient_ids = set()
-    pattern = re.compile(r"OAS1_(\d{4})", re.IGNORECASE)
-
-    full_dir = os.path.join(dataset_path, demention_dir)
-    if not os.path.isdir(full_dir):
-        return patient_ids
-    for fname in os.listdir(full_dir):
-        m = pattern.search(fname)
-        if m:
-            patient_ids.add(m.group(1))
-
-    patient_ids = sorted(patient_ids)
-
-    rng = random.Random(seed)
-    rng.shuffle(patient_ids)
-
-    split_index = int(0.8 * len(patient_ids))
-    train_ids = patient_ids[:split_index]
-    test_ids = patient_ids[split_index:]
-
-    return train_ids if isTrain else test_ids
+        return img, self.label_list[index]
 
 
-patients = unique_patient_ids(dataset_path, "Very mild Dementia", False)
-print(f"Found {len(patients)} unique patients")
-print(patients)
+train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
+print(train_dataset.__len__())
+print(train_dataset.__getitem__(train_dataset.__len__() -1))
+
+exit()
+
 
 
 temp_path = os.path.join(dataset_path, "Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
@@ -163,9 +165,7 @@ img = Image.open(temp_path)
 
 
 print(img.size)
-
 img = img_transforms(img)
-
 print(img.size())
 
 
@@ -179,9 +179,8 @@ img_pil.show()
 exit()
 
 
-
-train_dataset = CustomDataset(dataset_path, True, 67)
-test_dataset = CustomDataset(dataset_path, False, 67)
+train_dataset = CustomDataset(dataset_path, True, 42)
+test_dataset = CustomDataset(dataset_path, False, 42)
 
 
 batch_size = 32
@@ -214,16 +213,6 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Loss function
 criterion = nn.CrossEntropyLoss()
-
-
-
-
-
-
-
-
-
-
 
 
 
