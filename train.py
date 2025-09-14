@@ -9,10 +9,14 @@ from PIL import Image
 
 import os
 import kagglehub
+import random
+import re
 
 print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
+
+random.seed(67) # Random seed used for shuffling
 
 # Download latest version
 dataset_path = kagglehub.dataset_download("ninadaithal/imagesoasis")
@@ -24,8 +28,45 @@ print("Path to dataset files:", dataset_path)
 
 # 80% training, 20% testing
 
+
+
+dataset_path = os.path.join(dataset_path, "Very mild Dementia")
+# OAS1_0186_MR1_mpr-3_132.jpg
+rand_file_list(dataset_path, [1, 1])
+
 # Create a seed to randomly split the dataset
 class CustomDataset(Dataset):
+
+    def rand_file_list(file_path: str, people_num_list: list):
+        # Assume that the dataset incoming is shuffled 
+        folder_file_paths = []
+
+        # Loop through the incoming names and append file paths
+        for person in people_num_list:
+
+            for file in os.scandir(file_path):
+                
+                # Check if file
+                if file.is_file():
+
+                    # Get the name of the file
+                    file.name
+                    
+                    # Regex command to extract and compare with person
+                    
+                    if 1:
+                        folder_file_paths.append(file.path)
+
+                    else:
+                        pass # Move on to the next guy
+                    
+
+        # Shuffle before sending out
+        random.shuffle(folder_file_paths)
+
+        return folder_file_paths
+    
+
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
     def __init__(self, dataset_path: str, isTrain: bool, seed: int, target_transform=None, transform=None):
         # Get all the dataset locations
