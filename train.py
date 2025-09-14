@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 import torchvision.models as models
 from PIL import Image
 
-import os
+import os, re, random
 import kagglehub
 import random
 import re
@@ -124,6 +124,36 @@ class CustomDataset(Dataset):
         return 1, 1
 
 
+def unique_patient_ids(dataset_path: str, demention_dir: str, isTrain: bool, seed: int = 42):
+    """
+    Example 'OAS1_0023_MR1_mpr-3_127.jpg' -> patient id 23
+    """
+    patient_ids = set()
+    pattern = re.compile(r"OAS1_(\d{4})", re.IGNORECASE)
+
+    full_dir = os.path.join(dataset_path, demention_dir)
+    if not os.path.isdir(full_dir):
+        return patient_ids
+    for fname in os.listdir(full_dir):
+        m = pattern.search(fname)
+        if m:
+            patient_ids.add(m.group(1))
+
+    patient_ids = sorted(patient_ids)
+
+    rng = random.Random(seed)
+    rng.shuffle(patient_ids)
+
+    split_index = int(0.8 * len(patient_ids))
+    train_ids = patient_ids[:split_index]
+    test_ids = patient_ids[split_index:]
+
+    return train_ids if isTrain else test_ids
+
+
+patients = unique_patient_ids(dataset_path, "Very mild Dementia", False)
+print(f"Found {len(patients)} unique patients")
+print(patients)
 
 
 temp_path = os.path.join(dataset_path, "Mild Dementia/OAS1_0382_MR1_mpr-4_160.jpg")
@@ -182,7 +212,7 @@ except FileNotFoundError:
 # Adam optimizer ensures that each weight has its own learning weight
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# Loss function 
+# Loss function
 criterion = nn.CrossEntropyLoss()
 
 
