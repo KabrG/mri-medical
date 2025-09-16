@@ -30,7 +30,9 @@ print("Path to dataset files:", dataset_path)
 
 # Create a transform object for future use since we want to vary the incoming images
 i_transforms = transforms.Compose([
-    transforms.Grayscale(1),
+
+    # Three channels still because I want to use the weights from Resnet50
+    transforms.Grayscale(3), 
     # transforms.CenterCrop((228, 228)),
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -144,17 +146,21 @@ class MRIModel(torch.nn.Module):
 
     def __init__(self):
         super(MRIModel, self).__init__()
+        # Obtain the model (Try ResNet-50)
+        weights = models.ResNet50_Weights.DEFAULT
+        self.model = models.resnet50(weights=weights) 
 
-        self.linear1 = torch.nn.Linear(100, 200)
-        self.activation = torch.nn.ReLU()
-        self.linear2 = torch.nn.Linear(200, 10)
-        self.softmax = torch.nn.Softmax()
+
+        # Get number of features in the last layer
+        in_features = self.model.fc.in_features
+        
+        # Replace the fully connected layer at the end with 4 classes
+        self.model.fc = nn.Linear(in_features, 4) # We have 4 classes at the end
+
 
     def forward(self, x):
-        x = self.linear1(x)
-        x = self.activation(x)
-        x = self.linear2(x)
-        x = self.softmax(x)
+
+        x = self.model(x)
         return x
 
 
@@ -176,7 +182,8 @@ test_dataset = CustomDataset(dataset_path, False, 42, i_transforms)
 
 print("Created Dataset Objects")
 print(train_dataset.__len__())
-print(test_dataset.__len__())
+print(test_dataset.__getitem__(0))
+
 
 batch_size = 32
 
@@ -188,11 +195,12 @@ test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False)
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-exit()
-# Obtain the model (Try ResNet-50)
-weights = models.ResNet50_Weights.DEFAULT
-model = models.resnet50(weights=weights)
 
+# # Obtain the model (Try ResNet-50)
+# weights = models.ResNet50_Weights.DEFAULT
+# model = models.resnet50(weights=weights)
+
+model = MRIModel()
 # Check if a model aready exists
 try:
     model.load_state_dict(torch.load("mri_model.pth", map_location=device))
@@ -207,6 +215,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Loss function
 criterion = nn.CrossEntropyLoss()
+
 
 
 def train(epoch):
