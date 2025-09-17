@@ -31,13 +31,15 @@ print("Path to dataset files:", dataset_path)
 # Create a transform object for future use since we want to vary the incoming images
 i_transforms = transforms.Compose([
 
-    # Three channels still because I want to use the weights from Resnet50
-    transforms.Grayscale(3), 
-    # transforms.CenterCrop((228, 228)),
+    transforms.Grayscale(num_output_channels=1),  
     transforms.Resize((224, 224)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(10),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5], std=[0.5]) # default mean and median
+    transforms.Normalize(mean=[0.5], std=[0.5])   
+
 ])
+
 
 
 # Create a seed to randomly split the dataset
@@ -133,7 +135,6 @@ class CustomDataset(Dataset):
         return len(self.entire_file_list)
 
     
-
     def __getitem__(self, index):
         path = self.entire_file_list[index] 
         img = Image.open(path)
@@ -143,35 +144,52 @@ class CustomDataset(Dataset):
 
 class MRIModel(torch.nn.Module):
     # Resource: https://docs.pytorch.org/tutorials/beginner/introyt/modelsyt_tutorial.html
-
-    def __init__(self):
+    def __init__(self, freeze_backbone=True):
         super(MRIModel, self).__init__()
-        # Obtain the model (Try ResNet-50)
+
         weights = models.ResNet50_Weights.DEFAULT
-        self.model = models.resnet50(weights=weights) 
+        self.model = models.resnet50(weights=weights)
 
+        # Modify first conv layer to accept 1 channel since Resnet50 expects 3 channels
+        old_conv = self.model.conv1
+        self.model.conv1 = nn.Conv2d(
+            in_channels=1,      # grayscale
+            out_channels=old_conv.out_channels,
+            kernel_size=old_conv.kernel_size,
+            stride=old_conv.stride,
+            padding=old_conv.padding,
+            bias=old_conv.bias
+        )
 
-        # Get number of features in the last layer
+        # Initialize weights by averaging pretrained RGB channels
+        with torch.no_grad():
+            self.model.conv1.weight = nn.Parameter(
+                old_conv.weight.mean(dim=1, keepdim=True)
+            )
+
+        if freeze_backbone:
+            for param in self.model.parameters():
+                param.requires_grad = False
+
         in_features = self.model.fc.in_features
-        
-        # Replace the fully connected layer at the end with 4 classes
-        self.model.fc = nn.Linear(in_features, 4) # We have 4 classes at the end
-
+        self.model.fc = nn.Sequential(
+            nn.Linear(in_features, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, 4)
+        )
 
     def forward(self, x):
-
-        x = self.model(x)
-        return x
+        return self.model(x)
 
 
+# Only for displaying the image
 # img = Image.open(temp_path)
 
 # print(img.size)
 # img = img_transforms(img)
 # print(img.size())
 
-
-# Only for displaying the image
 # to_pil = transforms.ToPILImage()
 # img_pil = to_pil(img)
 
@@ -196,11 +214,7 @@ test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-# # Obtain the model (Try ResNet-50)
-# weights = models.ResNet50_Weights.DEFAULT
-# model = models.resnet50(weights=weights)
-
-model = MRIModel().to(device)
+model = MRIModel(freeze_backbone=True).to(device)
 # Check if a model aready exists
 try:
     model.load_state_dict(torch.load("mri_model.pth", map_location=device))
@@ -211,15 +225,17 @@ except FileNotFoundError:
 
 # Adjust learning rate for optimizer accordingly
 # Adam optimizer ensures that each weight has its own learning weight
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 # Loss function
 criterion = nn.CrossEntropyLoss()
 
 
 
-def train(epoch):
+def train():
     model.train()
+    running_loss = 0
+
     for batch_idx, (data, target) in enumerate(train_dataloader):
         data, target = data.to(device), target.to(device)
 
@@ -229,9 +245,14 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
+        running_loss += loss.item()
         if batch_idx % 100 == 0:
-            print(f"Train Epoch: {epoch} [{batch_idx*len(data)}/{len(train.dataset)} "
+            print(f"Train Epoch: {epoch} [{batch_idx*len(data)}/{len(train_dataloader.dataset)} "
                   f"({100. * batch_idx / len(train_dataloader):.0f}%)]\tLoss: {loss.item():.6f}")
+            
+    
+    running_loss += loss.item() * data.size(0)
+    return running_loss / len(train_dataloader.dataset)
 
 
 def test():
@@ -241,26 +262,47 @@ def test():
 
     with torch.no_grad():
         for data, target in test_dataloader:
+            
             data, target = data.to(device), target.to(device)
             output = model(data)
             test_loss += criterion(output, target).item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
-    test_loss /= len(train_dataloader.dataset)
-    accuracy = 100. * correct / len(train_dataloader.dataset)
-    print(f"\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_dataloader.dataset)}"
-          f" ({accuracy:.2f}%)\n")
+    test_loss /= len(test_dataloader.dataset)*data.size(0)
+    accuracy = 100. * correct / len(test_dataloader.dataset)
+    print(f"\nTest set: Average loss: {test_loss:.4f}, "
+          f"Accuracy: {correct}/{len(test_dataloader.dataset)} "
+          f"({accuracy:.2f}%)\n")
+
+    return test_loss, accuracy
 
 
-# Training loop
+
+# Training and testing loop
 
 print("Testing prior to training")
 
-epochs = 1
+epochs = 10
 test()
-for epoch in range(1, epochs): 
-    train(epoch)
+for epoch in range(1, epochs + 1): 
+    print("Epoch", epoch)
+    # if epoch < epochs/2:
+    #     train()
+    #     test()
+
+    # else:
+    #     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
+
+    #     # Fine turn layers
+    #     for name, param in model.model.named_parameters():
+    #         if "layer4" in name or "layer3" in name:
+    #             param.requires_grad = True
+
+    #             train()
+    #             test()
+
+    train()
     test()
 
     # Open file in read mode and read if it should continue running
