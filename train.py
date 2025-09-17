@@ -200,7 +200,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # weights = models.ResNet50_Weights.DEFAULT
 # model = models.resnet50(weights=weights)
 
-model = MRIModel()
+model = MRIModel().to(device)
 # Check if a model aready exists
 try:
     model.load_state_dict(torch.load("mri_model.pth", map_location=device))
