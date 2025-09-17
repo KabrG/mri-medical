@@ -5,7 +5,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 import torchvision.models as models
-from PIL import Image
+# from PIL import Image
+from PIL import ImageDraw, ImageFont, Image
+
 
 import os, re, random
 import kagglehub
@@ -16,8 +18,8 @@ print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
 
-r_seed = 42
-random.seed(r_seed) # Random seed used for shuffling
+# r_seed = 42
+# random.seed(r_seed) # Random seed used for shuffling
 
 # Download latest version
 dataset_path = kagglehub.dataset_download("ninadaithal/imagesoasis")
@@ -33,8 +35,17 @@ i_transforms = transforms.Compose([
 
     transforms.Grayscale(num_output_channels=1),  
     transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
+    # transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(10),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5], std=[0.5])   
+
+])
+
+test_transforms = transforms.Compose([
+
+    transforms.Grayscale(num_output_channels=1),  
+    transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5], std=[0.5])   
 
@@ -128,7 +139,7 @@ class CustomDataset(Dataset):
             # Add to label list
             self.label_list += [label for x in temp_arr]
 
-
+        print(len(self.label_list), "and", len(self.entire_file_list))
 
     def __len__(self):
         
@@ -183,11 +194,22 @@ class MRIModel(torch.nn.Module):
         return self.model(x)
 
 
+
+
+train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
+test_dataset = CustomDataset(dataset_path, False, 42, test_transforms)
+
+print("Created Dataset Objects")
+print(train_dataset.__len__())
+print(test_dataset.__getitem__(0))
+
 # Only for displaying the image
 # img = Image.open(temp_path)
 
+
+img = test_dataset.__getitem__(0)
+print(type(img))
 # print(img.size)
-# img = img_transforms(img)
 # print(img.size())
 
 # to_pil = transforms.ToPILImage()
@@ -195,13 +217,24 @@ class MRIModel(torch.nn.Module):
 
 # img_pil.show()
 
-train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
-test_dataset = CustomDataset(dataset_path, False, 42, i_transforms)
 
-print("Created Dataset Objects")
-print(train_dataset.__len__())
-print(test_dataset.__getitem__(0))
+# for i in range(10):
+#     index = int(random.random()*len(train_dataset))
+#     image, label = train_dataset[index]
 
+#     # If it's a tensor, convert to PIL before displaying
+#     to_pil = transforms.ToPILImage()
+#     image = to_pil(image)
+
+#     draw = ImageDraw.Draw(image)
+#     draw.text((5, 10), "label: " + str(label), fill="white") 
+#     draw.text((5, 20), "index: " + str(index), fill="white") 
+
+
+
+#     image.show()
+
+# exit()
 
 batch_size = 32
 
@@ -225,7 +258,9 @@ except FileNotFoundError:
 
 # Adjust learning rate for optimizer accordingly
 # Adam optimizer ensures that each weight has its own learning weight
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+# optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+
 
 # Loss function
 criterion = nn.CrossEntropyLoss()
@@ -265,11 +300,11 @@ def test():
             
             data, target = data.to(device), target.to(device)
             output = model(data)
-            test_loss += criterion(output, target).item()
+            test_loss += criterion(output, target).item() * data.size(0)
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
-    test_loss /= len(test_dataloader.dataset)*data.size(0)
+    test_loss /= len(test_dataloader.dataset)
     accuracy = 100. * correct / len(test_dataloader.dataset)
     print(f"\nTest set: Average loss: {test_loss:.4f}, "
           f"Accuracy: {correct}/{len(test_dataloader.dataset)} "
