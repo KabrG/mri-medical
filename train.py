@@ -18,7 +18,7 @@ print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
 
-# r_seed = 42
+r_seed = 70
 # random.seed(r_seed) # Random seed used for shuffling
 
 # Download latest version
@@ -58,6 +58,10 @@ class CustomDataset(Dataset):
 
     @staticmethod
     def rand_file_list(file_path: str, people_num_list: list)->list:
+
+        max_list_size = 19300
+        size = 0
+
         # Assume that the dataset incoming is shuffled 
         folder_file_paths = []
 
@@ -66,9 +70,13 @@ class CustomDataset(Dataset):
 
         # Loop through the incoming names and append file paths
         for person in people_num_list:
+            
+            if size > max_list_size:
+                break
 
             for file in os.scandir(file_path):
-                
+                if size > max_list_size:
+                    break
                 # Check if it is a file
                 if file.is_file():
 
@@ -77,6 +85,7 @@ class CustomDataset(Dataset):
 
                     if m and m.group(1) == person: # If it matches person str
                         folder_file_paths.append(file.path)
+                        size += 1
                     else:
                         pass # Move on to the next guy
                     
@@ -136,6 +145,10 @@ class CustomDataset(Dataset):
             # Append to big file list
             self.entire_file_list += temp_arr
 
+            # Let's try binary classification only
+            if label != 0:
+                label = 1
+                
             # Add to label list
             self.label_list += [label for x in temp_arr]
 
@@ -196,27 +209,14 @@ class MRIModel(torch.nn.Module):
 
 
 
-train_dataset = CustomDataset(dataset_path, True, 42, i_transforms)
-test_dataset = CustomDataset(dataset_path, False, 42, test_transforms)
+train_dataset = CustomDataset(dataset_path, True, r_seed, i_transforms)
+test_dataset = CustomDataset(dataset_path, False, r_seed, test_transforms)
 
 print("Created Dataset Objects")
 print(train_dataset.__len__())
 print(test_dataset.__getitem__(0))
 
 # Only for displaying the image
-# img = Image.open(temp_path)
-
-
-img = test_dataset.__getitem__(0)
-print(type(img))
-# print(img.size)
-# print(img.size())
-
-# to_pil = transforms.ToPILImage()
-# img_pil = to_pil(img)
-
-# img_pil.show()
-
 
 # for i in range(10):
 #     index = int(random.random()*len(train_dataset))
@@ -229,8 +229,6 @@ print(type(img))
 #     draw = ImageDraw.Draw(image)
 #     draw.text((5, 10), "label: " + str(label), fill="white") 
 #     draw.text((5, 20), "index: " + str(index), fill="white") 
-
-
 
 #     image.show()
 
