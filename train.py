@@ -341,12 +341,15 @@ print("Testing prior to training")
 
 epochs = 20
 test()
+override = True
+override_set = False
+
 for epoch in range(1, epochs + 1): 
     train()
     test()
 
     # Unfreeze layer4 at epoch 5
-    if epoch == 5:
+    if epoch == 5 and not override:
         print("Unfreezing layer4...")
         for name, param in model.model.named_parameters():
             if "layer4" in name:
@@ -357,7 +360,7 @@ for epoch in range(1, epochs + 1):
         )
 
     # Unfreeze layer3 at epoch 10
-    if epoch == 10:
+    elif epoch == 10 and not override:
         print("Unfreezing layer3...")
         for name, param in model.model.named_parameters():
             if "layer3" in name:
@@ -368,7 +371,7 @@ for epoch in range(1, epochs + 1):
         )
 
     # Unfreeze layer2 at epoch 15
-    if epoch == 15:
+    elif epoch == 15 and not override:
         print("Unfreezing layer2...")
         for name, param in model.model.named_parameters():
             if "layer2" in name:
@@ -377,6 +380,22 @@ for epoch in range(1, epochs + 1):
             filter(lambda p: p.requires_grad, model.parameters()),
             lr=1e-6
         )
+
+    elif override:
+        print("Unfreezing all layers...")
+        for name, param in model.model.named_parameters():
+            if "layer2" in name:
+                param.requires_grad = True
+            elif "layer3" in name:
+                param.requires_grad = True
+            elif "layer4" in name:
+                param.requires_grad = True
+
+        optimizer = optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=1e-6
+        )
+
 
 
     # Open file in read mode and read if it should continue running
