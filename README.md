@@ -9,7 +9,7 @@ Run the command `pip freeze > requirements.txt` to generate the requirements tex
 Run the command `pip install -r requirements.txt` to install the necessary packages
 
 
-For CUDA, make sure to use .
+For CUDA, make sure you use the correct installation depending on your GPU:
 
 `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128`
 
