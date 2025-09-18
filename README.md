@@ -1,6 +1,6 @@
 # Early Alzheimer's Detection
 
-This project uses MRI scans from the OASIS database to train a model for assessing Alzheimer’s risk. The model reached an accuracy of 81.0%. Since MRI scans are typically used to support clinical evaluation rather than provide a standalone diagnosis, this level of accuracy is considered reasonable.
+This project uses MRI scans from the OASIS database to train a model for assessing Alzheimer’s risk. The model reached an accuracy of 81.0%. Since MRI scans are typically used to support clinical evaluation rather than provide a standalone diagnosis, this level of accuracy is considered reasonable. Over 85,000 samples were used in training.
 
 Dataset: https://www.kaggle.com/datasets/ninadaithal/imagesoasis
 
