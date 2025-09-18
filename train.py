@@ -18,7 +18,7 @@ print(torch.__version__)
 print(torch.version.cuda)
 print(torch.cuda.is_available())
 
-r_seed = 70
+r_seed = 93
 # random.seed(r_seed) # Random seed used for shuffling
 
 # Download latest version
@@ -32,6 +32,12 @@ print("Path to dataset files:", dataset_path)
 
 # Create a transform object for future use since we want to vary the incoming images
 i_transforms = transforms.Compose([
+
+    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomAffine(degrees=10, translate=(0.05, 0.05)),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2),
 
     transforms.Grayscale(num_output_channels=1),  
     transforms.Resize((224, 224)),
@@ -59,9 +65,6 @@ class CustomDataset(Dataset):
     @staticmethod
     def rand_file_list(file_path: str, people_num_list: list)->list:
 
-        max_list_size = 19300
-        size = 0
-
         # Assume that the dataset incoming is shuffled 
         folder_file_paths = []
 
@@ -71,12 +74,8 @@ class CustomDataset(Dataset):
         # Loop through the incoming names and append file paths
         for person in people_num_list:
             
-            if size > max_list_size:
-                break
-
             for file in os.scandir(file_path):
-                if size > max_list_size:
-                    break
+
                 # Check if it is a file
                 if file.is_file():
 
@@ -85,7 +84,7 @@ class CustomDataset(Dataset):
 
                     if m and m.group(1) == person: # If it matches person str
                         folder_file_paths.append(file.path)
-                        size += 1
+
                     else:
                         pass # Move on to the next guy
                     
@@ -122,7 +121,6 @@ class CustomDataset(Dataset):
 
         return train_ids if isTrain else test_ids
 
-
     # https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
     def __init__(self, dataset_path: str, isTrain: bool, seed: int, img_transforms: transforms, target_transform=None):
         self.img_transforms = img_transforms
@@ -133,6 +131,8 @@ class CustomDataset(Dataset):
 
         # non = 0, very mild = 1, mild = 2, moderate = 3
         for label, type in enumerate(dementia_types):
+            if label == 0:
+                continue # Come back to this
             
             full_dir = os.path.join(dataset_path, type)
 
@@ -141,16 +141,39 @@ class CustomDataset(Dataset):
             
             # Get all the files
             temp_arr = self.rand_file_list(full_dir, people_list)
+            # print(f"Label {label} has {len(temp_arr)} images")
 
             # Append to big file list
             self.entire_file_list += temp_arr
 
             # Let's try binary classification only
+            y = label
             if label != 0:
-                label = 1
+                y = 1
                 
             # Add to label list
-            self.label_list += [label for x in temp_arr]
+            self.label_list += [y for x in temp_arr]
+
+        # Now, add label 0. Needs to appear as many times as other class
+        full_dir = os.path.join(dataset_path, "Non Demented")
+
+        # Generate people list
+        people_list = self.unique_patient_ids(full_dir, isTrain, seed)
+        
+        # Get all the files
+        temp_arr = self.rand_file_list(full_dir, people_list)
+
+        # Shuffle
+        random.shuffle(temp_arr)
+
+        # Remove elements until they are equal
+        while len(self.entire_file_list) < len(temp_arr):
+            temp_arr.pop()
+
+        # print("LOOK HERE", len(temp_arr), len(self.entire_file_list))
+        # Add temp array to the full list and add the labels
+        self.entire_file_list += temp_arr
+        self.label_list += [0 for x in temp_arr]
 
         print(len(self.label_list), "and", len(self.entire_file_list))
 
@@ -200,7 +223,7 @@ class MRIModel(torch.nn.Module):
             nn.Linear(in_features, 512),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 4)
+            nn.Linear(512, 2)
         )
 
     def forward(self, x):
@@ -238,7 +261,7 @@ batch_size = 32
 
 # Get the dataloaders
 train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True)
 
 
 # Select the device. If CUDA is available (Nvidia GPU's), then it will use it
@@ -257,7 +280,7 @@ except FileNotFoundError:
 # Adjust learning rate for optimizer accordingly
 # Adam optimizer ensures that each weight has its own learning weight
 # optimizer = optim.Adam(model.parameters(), lr=1e-4)
-optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=(1e-4))
 
 
 # Loss function
@@ -316,27 +339,45 @@ def test():
 
 print("Testing prior to training")
 
-epochs = 10
+epochs = 20
 test()
 for epoch in range(1, epochs + 1): 
-    print("Epoch", epoch)
-    # if epoch < epochs/2:
-    #     train()
-    #     test()
-
-    # else:
-    #     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
-
-    #     # Fine turn layers
-    #     for name, param in model.model.named_parameters():
-    #         if "layer4" in name or "layer3" in name:
-    #             param.requires_grad = True
-
-    #             train()
-    #             test()
-
     train()
     test()
+
+    # Unfreeze layer4 at epoch 5
+    if epoch == 5:
+        print("Unfreezing layer4...")
+        for name, param in model.model.named_parameters():
+            if "layer4" in name:
+                param.requires_grad = True
+        optimizer = optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=1e-5   # lower LR for fine-tuning
+        )
+
+    # Unfreeze layer3 at epoch 10
+    if epoch == 10:
+        print("Unfreezing layer3...")
+        for name, param in model.model.named_parameters():
+            if "layer3" in name:
+                param.requires_grad = True
+        optimizer = optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=5e-6
+        )
+
+    # Unfreeze layer2 at epoch 15
+    if epoch == 15:
+        print("Unfreezing layer2...")
+        for name, param in model.model.named_parameters():
+            if "layer2" in name:
+                param.requires_grad = True
+        optimizer = optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=1e-6
+        )
+
 
     # Open file in read mode and read if it should continue running
     run_status = "stop" # By default, the program will stop
